@@ -17,7 +17,6 @@
 nodejs-hw/
 ├── src/
 │   └── server.js
-├── index.js
 ├── .env
 ├── .env.example
 ├── .gitignore
@@ -26,6 +25,8 @@ nodejs-hw/
 ├── eslint.config.mjs
 └── package.json
 ```
+
+Проєкт використовує ES-модулі (`"type": "module"` у `package.json`), тому `src/server.js` написаний через `import`/`export` і є єдиною точкою входу — запускається напряму (`node src/server.js`), без окремого `index.js`.
 
 ## Запуск локально
 
@@ -41,7 +42,7 @@ nodejs-hw/
    ```
    npm run dev
    ```
-   Сервер стартує на порті зі змінної `PORT` (за замовчуванням — 3000).
+   Сервер стартує на порті зі змінної `PORT` (за замовчуванням — 3000). Логи запитів форматуються через `pino-http` + `pino-pretty`.
 
 ## Маршрути
 
