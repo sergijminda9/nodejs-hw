@@ -1,12 +1,14 @@
-# nodejs-hw — 03-validation
+# nodejs-hw — 04-auth
 
-Express-додаток для роботи з колекцією нотаток: MongoDB через Mongoose, повний CRUD, пагінація, фільтрація за тегом, повнотекстовий пошук та валідація вхідних даних через `celebrate`.
+Express-додаток для роботи з колекцією нотаток: MongoDB через Mongoose, повний CRUD, пагінація, фільтрація, пошук, валідація через `celebrate`, і тепер — реєстрація, логін, логаут, сесії на кукі та приватні (прив'язані до користувача) нотатки.
 
 ## Стек
 
 - Express 5
 - Mongoose
 - celebrate + Joi (валідація)
+- bcrypt (хешування паролів)
+- cookie-parser
 - http-errors
 - cors
 - dotenv
@@ -20,20 +22,29 @@ Express-додаток для роботи з колекцією нотаток:
 nodejs-hw/
 ├── src/
 │   ├── constants/
-│   │   └── tags.js
+│   │   ├── tags.js
+│   │   └── time.js
 │   ├── controllers/
+│   │   ├── authController.js
 │   │   └── notesController.js
 │   ├── db/
 │   │   └── connectMongoDB.js
 │   ├── middleware/
+│   │   ├── authenticate.js
 │   │   ├── logger.js
 │   │   ├── notFoundHandler.js
 │   │   └── errorHandler.js
 │   ├── models/
-│   │   └── note.js
+│   │   ├── note.js
+│   │   ├── session.js
+│   │   └── user.js
 │   ├── routes/
+│   │   ├── authRoutes.js
 │   │   └── notesRoutes.js
+│   ├── services/
+│   │   └── auth.js
 │   ├── validations/
+│   │   ├── authValidation.js
 │   │   └── notesValidation.js
 │   └── server.js
 ├── notes.json
@@ -61,54 +72,57 @@ nodejs-hw/
    npm run dev
    ```
 
-## Маршрути
+## Автентифікація
 
-### GET /notes
+### POST /auth/register
 
-Повертає нотатки з пагінацією, фільтрацією за тегом і текстовим пошуком.
+Тіло запиту: `{ "email": "...", "password": "..." }` (пароль мінімум 8 символів).
 
-Query-параметри (усі необов'язкові):
+- `400 Email in use` — якщо email вже зайнято
+- `201` — створений користувач (без пароля), у відповідь встановлюються кукі `accessToken`, `refreshToken`, `sessionId`
 
-| Параметр  | Тип    | За замовчуванням | Обмеження                          |
-|-----------|--------|-------------------|--------------------------------------|
-| `page`    | number | `1`                | ціле, мінімум 1                      |
-| `perPage` | number | `10`               | ціле, від 5 до 20                    |
-| `tag`     | string | —                  | одне з `src/constants/tags.js`       |
-| `search`  | string | —                  | шукає в `title` і `content` (regex, регістронезалежно) |
+### POST /auth/login
 
-Приклад:
-```
-GET /notes?page=1&perPage=15&tag=Todo&search=hello
-```
+Тіло запиту: `{ "email": "...", "password": "..." }`.
 
-Відповідь `200`:
-```json
-{
-  "page": 1,
-  "perPage": 15,
-  "totalNotes": 150,
-  "totalPages": 10,
-  "notes": [ /* масив нотаток */ ]
-}
-```
+- `401 Invalid credentials` — якщо email не знайдено або пароль невірний
+- `200` — залогінений користувач (без пароля), стара сесія видаляється, встановлюються нові кукі
 
-### Інші маршрути
+### POST /auth/refresh
 
-| Метод  | Шлях             | Валідація                                                | Відповідь                                     |
-|--------|------------------|------------------------------------------------------------|--------------------------------------------------|
-| GET    | `/notes/:noteId` | `noteId` — валідний Mongo ObjectId                          | `200`, об'єкт нотатки / `404 Note not found`      |
-| POST   | `/notes`         | `title` обов'язковий (мін. 1 символ), `content`/`tag` необов'язкові | `201`, створений об'єкт                          |
-| PATCH  | `/notes/:noteId` | `noteId` валідний; тіло — хоча б одне з `title`/`content`/`tag` | `200`, оновлений об'єкт / `404 Note not found`   |
-| DELETE | `/notes/:noteId` | `noteId` — валідний Mongo ObjectId                          | `200`, видалений об'єкт / `404 Note not found`   |
-| *      | будь-що інше     | —                                                            | `404 { "message": "Route not found" }`            |
+Без тіла запиту, дані беруться з кукі `sessionId` і `refreshToken`.
 
-Помилки валідації (celebrate) повертають `400` з деталями по кожному сегменту запиту (`query` / `params` / `body`). Інші серверні помилки — `500`, або відповідний статус, якщо кинуто через `http-errors`.
+- `401 Session not found` — сесію не знайдено
+- `401 Session token expired` — refresh-токен прострочений
+- `200 { "message": "Session refreshed" }` — стара сесія видалена, встановлені нові кукі
+
+### POST /auth/logout
+
+Без тіла запиту, дані беруться з кукі `sessionId`.
+
+- `204` — сесія видалена (якщо існувала), кукі очищені
+
+Усі кукі встановлюються з параметрами `httpOnly: true`, `secure: true`, `sameSite: 'none'`. `accessToken` живе 15 хвилин, `refreshToken` і `sessionId` — 1 добу.
+
+## Нотатки (потребують автентифікації)
+
+Усі маршрути нижче захищені middleware `authenticate` — потрібен дійсний кукі `accessToken`. Нотатки прив'язані до `userId` і видимі/редаговані лише власником.
+
+| Метод  | Шлях             | Відповідь                                          |
+|--------|------------------|-------------------------------------------------------|
+| GET    | `/notes`         | `200`, пагінація + фільтр `tag` + пошук `search` (лише свої нотатки) |
+| GET    | `/notes/:noteId` | `200` / `404 Note not found` (лише своя нотатка)      |
+| POST   | `/notes`         | `201`, нова нотатка з `userId` поточного користувача  |
+| PATCH  | `/notes/:noteId` | `200` / `404 Note not found` (лише своя нотатка)      |
+| DELETE | `/notes/:noteId` | `200` / `404 Note not found` (лише своя нотатка)      |
+
+Помилки автентифікації: `401 Missing access token`, `401 Session not found`, `401 Access token expired`, або `401` без повідомлення, якщо користувача сесії більше не існує.
 
 ## Деплой на Render.com
 
-1. Запуште гілку `03-validation` у свій GitHub-репозиторій `nodejs-hw`.
-2. У Render: **New → Web Service**, підключіть репозиторій, оберіть гілку `03-validation`.
+1. Запуште гілку `04-auth` у свій GitHub-репозиторій `nodejs-hw`.
+2. У Render: **New → Web Service** (або перемкніть Branch в існуючому сервісі), оберіть гілку `04-auth`.
 3. Build command: `npm install`, Start command: `npm start`.
 4. У розділі **Environment** додайте змінні `PORT` та `MONGO_URL`.
 5. У MongoDB Atlas переконайтесь, що в **Network Access** дозволено `0.0.0.0/0`.
-6. Після деплою перевірте всі маршрути на задеплойованому URL.
+6. Після деплою перевірте `/auth/register`, `/auth/login`, `/notes` (з кукі) на задеплойованому URL.
