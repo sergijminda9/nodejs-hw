@@ -1,0 +1,52 @@
+[
+  {
+    "title": "Buy groceries",
+    "content": "Milk, eggs, bread, and coffee",
+    "tag": "Shopping"
+  },
+  {
+    "title": "Team standup",
+    "content": "Discuss sprint progress and blockers",
+    "tag": "Meeting"
+  },
+  {
+    "title": "Finish project report",
+    "content": "Complete the final draft and submit it",
+    "tag": "Work"
+  },
+  {
+    "title": "Plan weekend trip",
+    "content": "Research destinations and book accommodation",
+    "tag": "Travel"
+  },
+  {
+    "title": "Pay utility bills",
+    "content": "Electricity and water bills due this week",
+    "tag": "Finance"
+  },
+  {
+    "title": "Morning workout",
+    "content": "30 minutes of cardio and stretching",
+    "tag": "Health"
+  },
+  {
+    "title": "Read a book",
+    "content": "Continue reading the current novel",
+    "tag": "Personal"
+  },
+  {
+    "title": "Brainstorm app features",
+    "content": "List new feature ideas for the next release",
+    "tag": "Ideas"
+  },
+  {
+    "title": "Renew passport",
+    "content": "Check expiration date and schedule an appointment",
+    "tag": "Important"
+  },
+  {
+    "title": "Clean the house",
+    "content": "",
+    "tag": "Todo"
+  }
+]
