@@ -1,13 +1,15 @@
-# nodejs-hw — 01-express
+# nodejs-hw — 02-mongodb
 
-Мінімальний Express-сервер для роботи з колекцією нотаток.
+Express-додаток для роботи з колекцією нотаток, підключений до MongoDB через Mongoose. Реалізовано повний набір CRUD-операцій, код розбитий на модулі (роути / контролери / модель / middleware / підключення до БД).
 
 ## Стек
 
 - Express 5
+- Mongoose
+- http-errors
 - cors
 - dotenv
-- pino-http (логування запитів)
+- pino-http + pino-pretty (логування запитів)
 - nodemon (розробка)
 - eslint (лінтинг)
 
@@ -16,7 +18,20 @@
 ```
 nodejs-hw/
 ├── src/
+│   ├── controllers/
+│   │   └── notesController.js
+│   ├── db/
+│   │   └── connectMongoDB.js
+│   ├── middleware/
+│   │   ├── logger.js
+│   │   ├── notFoundHandler.js
+│   │   └── errorHandler.js
+│   ├── models/
+│   │   └── note.js
+│   ├── routes/
+│   │   └── notesRoutes.js
 │   └── server.js
+├── notes.json
 ├── .env
 ├── .env.example
 ├── .gitignore
@@ -26,7 +41,15 @@ nodejs-hw/
 └── package.json
 ```
 
-Проєкт використовує ES-модулі (`"type": "module"` у `package.json`), тому `src/server.js` написаний через `import`/`export` і є єдиною точкою входу — запускається напряму (`node src/server.js`), без окремого `index.js`.
+Проєкт використовує ES-модулі (`"type": "module"`), `src/server.js` — єдина точка входу.
+
+## Налаштування MongoDB Atlas
+
+1. Створіть безкоштовний кластер на [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+2. У **Network Access** додайте `0.0.0.0/0` (Allow access from anywhere).
+3. У **Database Access** створіть користувача з паролем.
+4. Скопіюйте connection string (Drivers → Node.js) і підставте у змінну `MONGO_URL` у `.env`.
+5. За бажанням імпортуйте базовий набір нотаток з `notes.json` у колекцію `notes` через Compass або UI Atlas.
 
 ## Запуск локально
 
@@ -34,7 +57,7 @@ nodejs-hw/
    ```
    npm install
    ```
-2. Переконайтесь, що є файл `.env` зі змінною `PORT` (скопіюйте `.env.example`, якщо потрібно):
+2. Скопіюйте `.env.example` у `.env` і підставте свої значення `PORT` та `MONGO_URL`:
    ```
    cp .env.example .env
    ```
@@ -42,23 +65,44 @@ nodejs-hw/
    ```
    npm run dev
    ```
-   Сервер стартує на порті зі змінної `PORT` (за замовчуванням — 3000). Логи запитів форматуються через `pino-http` + `pino-pretty`.
+   При вдалому підключенні до бази в консолі з'явиться:
+   ```
+   ✅ MongoDB connection established successfully
+   ```
 
 ## Маршрути
 
-| Метод | Шлях             | Відповідь                                                        |
-|-------|------------------|-------------------------------------------------------------------|
-| GET   | `/notes`         | `200 { "message": "Retrieved all notes" }`                        |
-| GET   | `/notes/:noteId` | `200 { "message": "Retrieved note with ID: <noteId>" }`            |
-| GET   | `/test-error`    | Кидає помилку → обробляється error middleware → `500`             |
-| *     | будь-що інше     | `404 { "message": "Route not found" }`                             |
+| Метод  | Шлях             | Опис                    | Відповідь                                    |
+|--------|------------------|--------------------------|-------------------------------------------------|
+| GET    | `/notes`         | Отримати всі нотатки     | `200`, масив нотаток                             |
+| GET    | `/notes/:noteId` | Отримати нотатку за ID   | `200`, об'єкт нотатки / `404 Note not found`     |
+| POST   | `/notes`         | Створити нотатку         | `201`, створений об'єкт                          |
+| PATCH  | `/notes/:noteId` | Оновити нотатку за ID    | `200`, оновлений об'єкт / `404 Note not found`   |
+| DELETE | `/notes/:noteId` | Видалити нотатку за ID   | `200`, видалений об'єкт / `404 Note not found`   |
+| *      | будь-що інше     | Неіснуючий маршрут       | `404 { "message": "Route not found" }`           |
+
+Помилки на сервері (валідація Mongoose тощо) повертають `500 { "message": "<текст помилки>" }`, а помилки, кинуті через `http-errors` (наприклад `Note not found`), повертають відповідний статус (404) з тим самим форматом.
+
+### Модель Note
+
+```js
+{
+  title: String,    // обов'язкове, trim
+  content: String,  // необов'язкове, за замовчуванням '', trim
+  tag: String,      // одне з: Work, Personal, Meeting, Shopping, Ideas,
+                     // Travel, Finance, Health, Important, Todo
+                     // за замовчуванням 'Todo'
+  createdAt: Date,  // автоматично (timestamps: true)
+  updatedAt: Date,  // автоматично (timestamps: true)
+}
+```
 
 ## Деплой на Render.com
 
-1. Запуште гілку `01-express` у свій GitHub-репозиторій `nodejs-hw`.
-2. У Render: **New → Web Service**, підключіть репозиторій, оберіть гілку `01-express`.
+1. Запуште гілку `02-mongodb` у свій GitHub-репозиторій `nodejs-hw`.
+2. У Render: **New → Web Service**, підключіть репозиторій, оберіть гілку `02-mongodb`.
 3. Налаштування білду:
    - Build command: `npm install`
    - Start command: `npm start`
-4. У розділі **Environment** додайте змінну `PORT` (Render зазвичай підставляє свій `PORT` автоматично — сервер це коректно підхопить, бо код читає `process.env.PORT`).
-5. Після деплою перевірте `https://<your-app>.onrender.com/notes` та інші маршрути.
+4. У розділі **Environment** додайте змінні `PORT` та `MONGO_URL` (той самий connection string, що й локально; переконайтесь, що в Atlas дозволений доступ з будь-якої IP — `0.0.0.0/0`).
+5. Після деплою перевірте всі маршрути на задеплоєному URL.
