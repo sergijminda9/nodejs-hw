@@ -10,10 +10,7 @@ import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import notesRoutes from './routes/notesRoutes.js';
 import authRoutes from './routes/authRoutes.js';
-<<<<<<< Updated upstream
-=======
 import userRoutes from './routes/userRoutes.js';
->>>>>>> Stashed changes
 
 const PORT = process.env.PORT || 3000;
 
@@ -33,10 +30,7 @@ const startServer = async () => {
   );
 
   app.use(authRoutes);
-<<<<<<< Updated upstream
-=======
   app.use(userRoutes);
->>>>>>> Stashed changes
   app.use(notesRoutes);
 
   app.use(notFoundHandler);
